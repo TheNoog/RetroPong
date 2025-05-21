@@ -5,22 +5,24 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
 export const pongAiInputSchema = z.object({
-  ballX: z.number(),
-  ballY: z.number(),
-  ballDX: z.number(),
-  ballDY: z.number(),
-  paddleY: z.number(), // AI's current paddle Y center
-  opponentPaddleY: z.number(), // Opponent's paddle Y center
-  boardHeight: z.number(),
-  paddleHeight: z.number(),
-  isBallMovingTowardsAi: z.boolean(), // True if ball.dx is positive (assuming AI is right paddle)
-  paddleSpeed: z.number(),
+  ballX: z.number().describe("The current X position of the ball."),
+  ballY: z.number().describe("The current Y position of the ball."),
+  ballDX: z.number().describe("The current X-axis velocity of the ball."),
+  ballDY: z.number().describe("The current Y-axis velocity of the ball."),
+  paddleY: z.number().describe("The AI's current paddle Y center position."),
+  opponentPaddleY: z.number().describe("The opponent's paddle Y center position."),
+  boardHeight: z.number().describe("The height of the game board."),
+  paddleHeight: z.number().describe("The height of the AI's paddle."),
+  isBallMovingTowardsAi: z.boolean().describe("True if the ball is moving towards the AI paddle."),
+  paddleSpeed: z.number().describe("The maximum speed the AI paddle can move per update."),
 });
 
 export const pongAiOutputSchema = z.object({
-  targetY: z.number(), // Target Y center for the AI paddle
+  targetY: z.number().describe("The target Y center position for the AI paddle."),
 });
 
+// This is the Genkit flow. In a real scenario, it might call an LLM.
+// For this Pong AI, it's a mock implementation with deterministic logic.
 export const predictPaddleMove = ai.defineFlow(
   {
     name: 'predictPaddleMove',
@@ -28,10 +30,6 @@ export const predictPaddleMove = ai.defineFlow(
     outputSchema: pongAiOutputSchema,
   },
   async (input) => {
-    // This is a MOCK implementation.
-    // A real GenAI flow would use a model (e.g., ai.generate) with tools/prompts
-    // to determine the paddle's optimal position.
-
     let newTargetY = input.paddleY; // Current Y center of AI paddle
 
     if (input.isBallMovingTowardsAi) {
