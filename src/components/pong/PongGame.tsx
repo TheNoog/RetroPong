@@ -9,6 +9,7 @@ import ScoreDisplay from './ScoreDisplay';
 import { Button } from '@/components/ui/button';
 import type { pongAiInputSchema } from '@/ai/flows/pongAi';
 import { useToast } from '@/hooks/use-toast';
+import type { z } from 'zod';
 
 const BOARD_WIDTH = 800;
 const BOARD_HEIGHT = 600;
@@ -120,7 +121,7 @@ const PongGame: React.FC = () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
       if (aiUpdateTimeoutRef.current) clearTimeout(aiUpdateTimeoutRef.current);
     };
-  }, [gameStatus]); // Added gameStatus to dependency array
+  }, [gameStatus]);
 
   const update = useCallback(() => {
     if (gameStatus !== "playing") return;
@@ -186,14 +187,14 @@ const PongGame: React.FC = () => {
 
       if (hit) {
         newHitCounter = hitCounter + 1;
-        setHitCounter(newHitCounter); // Update state for next frame
+        setHitCounter(newHitCounter); 
 
         if (newHitCounter <= RAMP_UP_HITS) {
           const speedIncrement = (INITIAL_BALL_SPEED_TARGET - VERY_SLOW_INITIAL_SPEED) / RAMP_UP_HITS;
           newSpeed = VERY_SLOW_INITIAL_SPEED + (newHitCounter * speedIncrement);
-          newSpeed = Math.min(newSpeed, INITIAL_BALL_SPEED_TARGET); // Cap at target
+          newSpeed = Math.min(newSpeed, INITIAL_BALL_SPEED_TARGET); 
         } else {
-          newSpeed = Math.min(MAX_BALL_SPEED, prevBall.speed * 1.05); // Existing progressive increase
+          newSpeed = Math.min(MAX_BALL_SPEED, prevBall.speed * 1.05); 
         }
       }
       
@@ -205,27 +206,31 @@ const PongGame: React.FC = () => {
 
       // Scoring
       if (newX - prevBall.radius < 0) { 
-        setScore(s => ({ ...s, player2: s.player2 + 1 }));
-        if (score.player2 + 1 >= WINNING_SCORE) {
-          setGameStatus("gameover");
-          toast({ title: "Game Over!", description: `${gameMode === 'humanVsAi' ? 'AI' : 'Player 2'} Wins!`});
-        } else {
-          resetBall('player1');
-        }
+        setScore(s => {
+          const newP2Score = s.player2 + 1;
+          if (newP2Score >= WINNING_SCORE) {
+            setGameStatus("gameover");
+          } else {
+            resetBall('player1');
+          }
+          return { ...s, player2: newP2Score };
+        });
       } else if (newX + prevBall.radius > BOARD_WIDTH) { 
-        setScore(s => ({ ...s, player1: s.player1 + 1 }));
-        if (score.player1 + 1 >= WINNING_SCORE) {
-          setGameStatus("gameover");
-          toast({ title: "Game Over!", description: "Player 1 Wins!"});
-        } else {
-          resetBall('player2');
-        }
+        setScore(s => {
+          const newP1Score = s.player1 + 1;
+          if (newP1Score >= WINNING_SCORE) {
+            setGameStatus("gameover");
+          } else {
+            resetBall('player2');
+          }
+          return { ...s, player1: newP1Score };
+        });
       }
       return { ...prevBall, x: newX, y: newY, dx: newDx, dy: newDy, speed: newSpeed };
     });
     
     gameLoopRef.current = requestAnimationFrame(update);
-  }, [gameStatus, gameMode, paddle1.y, paddle2.y, resetBall, score, toast, hitCounter]);
+  }, [gameStatus, gameMode, paddle1.y, paddle2.y, resetBall, hitCounter]); // Removed score and toast from here
 
   useEffect(() => {
     if (gameStatus === "playing") {
@@ -252,6 +257,17 @@ const PongGame: React.FC = () => {
       };
     }
   }, [gameStatus, gameMode, fetchAiMove, ball.dx, paddle2.y]);
+
+  // Effect to handle game over toast
+  useEffect(() => {
+    if (gameStatus === "gameover") {
+      if (score.player1 >= WINNING_SCORE) {
+        toast({ title: "Game Over!", description: "Player 1 Wins!"});
+      } else if (score.player2 >= WINNING_SCORE) {
+        toast({ title: "Game Over!", description: `${gameMode === 'humanVsAi' ? 'AI' : 'Player 2'} Wins!`});
+      }
+    }
+  }, [gameStatus, score, gameMode, toast]);
 
 
   const startGame = (mode: GameMode) => {
@@ -344,4 +360,4 @@ const PongGame: React.FC = () => {
 
 export default PongGame;
 
-  
+    

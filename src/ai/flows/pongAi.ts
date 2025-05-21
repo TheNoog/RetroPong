@@ -1,8 +1,8 @@
-import { defineFlow } from 'genkit/flow';
+
+'use server';
+
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-// Assuming genkit and AI model (e.g. geminiPro) are configured in @/ai/genkit.ts
-// For this mock, we won't actually use the AI model.
-// import { ai } from '@/ai/genkit'; 
 
 export const pongAiInputSchema = z.object({
   ballX: z.number(),
@@ -21,14 +21,11 @@ export const pongAiOutputSchema = z.object({
   targetY: z.number(), // Target Y center for the AI paddle
 });
 
-export const predictPaddleMove = defineFlow(
+export const predictPaddleMove = ai.defineFlow(
   {
     name: 'predictPaddleMove',
     inputSchema: pongAiInputSchema,
     outputSchema: pongAiOutputSchema,
-    authPolicy: (auth, input) => { // Example auth policy, adjust as needed
-      // Allow all for now for simplicity in this context
-    }
   },
   async (input) => {
     // This is a MOCK implementation.
