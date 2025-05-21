@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -101,7 +102,15 @@ const PongGame: React.FC = () => {
 
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => keysPressed.current.add(e.key.toLowerCase());
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'escape' && gameStatus === "playing") {
+        setGameStatus("menu");
+        if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+        if (aiUpdateTimeoutRef.current) clearTimeout(aiUpdateTimeoutRef.current);
+      } else {
+        keysPressed.current.add(e.key.toLowerCase());
+      }
+    };
     const handleKeyUp = (e: KeyboardEvent) => keysPressed.current.delete(e.key.toLowerCase());
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -111,7 +120,7 @@ const PongGame: React.FC = () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
       if (aiUpdateTimeoutRef.current) clearTimeout(aiUpdateTimeoutRef.current);
     };
-  }, []);
+  }, [gameStatus]); // Added gameStatus to dependency array
 
   const update = useCallback(() => {
     if (gameStatus !== "playing") return;
@@ -272,6 +281,11 @@ const PongGame: React.FC = () => {
                     <li><code className="bg-muted px-2 py-1 rounded text-sm">ArrowDown</code> key: Move Down</li>
                 </ul>
               </li>
+               <li className="mt-2"><strong>Game:</strong>
+                 <ul className="list-disc list-inside pl-6">
+                    <li><code className="bg-muted px-2 py-1 rounded text-sm">Escape</code> key: Quit game and return to menu</li>
+                </ul>
+              </li>
             </ul>
           </div>
         </div>
@@ -290,7 +304,7 @@ const PongGame: React.FC = () => {
           <Button size="lg" className="w-64 text-xl py-8" onClick={() => startGame("humanVsAi")}>Player vs AI</Button>
           <Button size="lg" className="w-64 text-xl py-8" onClick={() => startGame("humanVsHuman")}>Player vs Player</Button>
         </div>
-        <p className="mt-12 text-muted-foreground">P1: W (Up), S (Down) | P2: ArrowUp, ArrowDown</p>
+        <p className="mt-12 text-muted-foreground">P1: W (Up), S (Down) | P2: ArrowUp, ArrowDown | Esc: Menu</p>
       </div>
     );
   }
@@ -322,10 +336,12 @@ const PongGame: React.FC = () => {
         )}
       </div>
       <div className="mt-4 text-muted-foreground">
-          P1: W (Up), S (Down) {gameMode === "humanVsHuman" && "| P2: ArrowUp, ArrowDown"}
+          P1: W (Up), S (Down) {gameMode === "humanVsHuman" && "| P2: ArrowUp, ArrowDown"} | Esc: Menu
       </div>
     </div>
   );
 };
 
 export default PongGame;
+
+  
