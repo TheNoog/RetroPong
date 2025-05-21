@@ -14,8 +14,10 @@ const BOARD_HEIGHT = 600;
 const PADDLE_WIDTH = 15;
 const PADDLE_HEIGHT = 100;
 const BALL_RADIUS = 10;
-const PADDLE_SPEED = 10; // Increased speed for responsiveness
-const INITIAL_BALL_SPEED = 5;
+const PADDLE_SPEED = 10;
+const VERY_SLOW_INITIAL_SPEED = 1; // Start speed very slow
+const INITIAL_BALL_SPEED_TARGET = 5; // The speed we ramp up to
+const RAMP_UP_HITS = 50; // Number of hits to reach INITIAL_BALL_SPEED_TARGET
 const MAX_BALL_SPEED = 15;
 const WINNING_SCORE = 5;
 
@@ -23,10 +25,11 @@ const PongGame: React.FC = () => {
   const { toast } = useToast();
   const [paddle1, setPaddle1] = useState<PaddleType>({ y: BOARD_HEIGHT / 2, height: PADDLE_HEIGHT, width: PADDLE_WIDTH, speed: PADDLE_SPEED });
   const [paddle2, setPaddle2] = useState<PaddleType>({ y: BOARD_HEIGHT / 2, height: PADDLE_HEIGHT, width: PADDLE_WIDTH, speed: PADDLE_SPEED });
-  const [ball, setBall] = useState<BallType>({ x: BOARD_WIDTH / 2, y: BOARD_HEIGHT / 2, radius: BALL_RADIUS, dx: INITIAL_BALL_SPEED, dy: INITIAL_BALL_SPEED, speed: INITIAL_BALL_SPEED });
+  const [ball, setBall] = useState<BallType>({ x: BOARD_WIDTH / 2, y: BOARD_HEIGHT / 2, radius: BALL_RADIUS, dx: VERY_SLOW_INITIAL_SPEED, dy: VERY_SLOW_INITIAL_SPEED, speed: VERY_SLOW_INITIAL_SPEED });
   const [score, setScore] = useState<Score>({ player1: 0, player2: 0 });
-  const [gameStatus, setGameStatus] = useState<GameStatus>("menu");
+  const [gameStatus, setGameStatus] = useState<GameStatus>("instructions"); // Start with instructions
   const [gameMode, setGameMode] = useState<GameMode>("humanVsAi");
+  const [hitCounter, setHitCounter] = useState(0);
   
   const keysPressed = useRef<Set<string>>(new Set());
   const gameLoopRef = useRef<number>();
@@ -37,10 +40,11 @@ const PongGame: React.FC = () => {
       x: BOARD_WIDTH / 2,
       y: BOARD_HEIGHT / 2,
       radius: BALL_RADIUS,
-      dx: servedTo === 'player1' ? -INITIAL_BALL_SPEED : INITIAL_BALL_SPEED,
-      dy: Math.random() > 0.5 ? INITIAL_BALL_SPEED : -INITIAL_BALL_SPEED,
-      speed: INITIAL_BALL_SPEED,
+      dx: servedTo === 'player1' ? -VERY_SLOW_INITIAL_SPEED : VERY_SLOW_INITIAL_SPEED,
+      dy: Math.random() > 0.5 ? VERY_SLOW_INITIAL_SPEED : -VERY_SLOW_INITIAL_SPEED,
+      speed: VERY_SLOW_INITIAL_SPEED,
     });
+    setHitCounter(0); // Reset hit counter
   }, []);
 
   const resetGame = useCallback(() => {
@@ -52,7 +56,7 @@ const PongGame: React.FC = () => {
   }, [resetBall]);
 
   const fetchAiMove = useCallback(async (currentPaddle2Y: number) => {
-    if (gameMode !== 'humanVsAi' || ball.dx < 0) { // Only if ball is moving towards AI (right paddle)
+    if (gameMode !== 'humanVsAi' || ball.dx < 0) { 
       return;
     }
 
@@ -78,12 +82,10 @@ const PongGame: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('AI Error:', errorData);
-        // toast({ title: "AI Error", description: errorData.details || errorData.error || "Could not get AI move.", variant: "destructive" });
-        return; // Don't update paddle if AI fails
+        return; 
       }
       const data = await response.json();
       if (data.targetY !== undefined) {
-        // Smoothly move paddle towards targetY
         setPaddle2(prev => {
             const diff = data.targetY - prev.y;
             const move = Math.max(-PADDLE_SPEED, Math.min(PADDLE_SPEED, diff));
@@ -94,9 +96,8 @@ const PongGame: React.FC = () => {
       }
     } catch (error) {
       console.error('Network error fetching AI move:', error);
-      // toast({ title: "Network Error", description: "Could not connect to AI service.", variant: "destructive" });
     }
-  }, [ball.x, ball.y, ball.dx, ball.dy, paddle1.y, gameMode, toast]);
+  }, [ball.x, ball.y, ball.dx, ball.dy, paddle1.y, gameMode]);
 
 
   useEffect(() => {
@@ -141,50 +142,60 @@ const PongGame: React.FC = () => {
       let newDx = prevBall.dx;
       let newDy = prevBall.dy;
       let newSpeed = prevBall.speed;
+      let newHitCounter = hitCounter;
 
       // Wall collision (top/bottom)
       if (newY - prevBall.radius < 0 || newY + prevBall.radius > BOARD_HEIGHT) {
         newDy = -newDy;
-        newY = prevBall.y + newDy; // adjust to prevent sticking
+        newY = prevBall.y + newDy; 
       }
 
       // Paddle collision
-      // Player 1 (left paddle)
+      let hit = false;
       if (newDx < 0 && 
           newX - prevBall.radius < PADDLE_WIDTH && 
           newX - prevBall.radius > 0 &&
           newY > paddle1.y - PADDLE_HEIGHT / 2 && 
           newY < paddle1.y + PADDLE_HEIGHT / 2) {
+        hit = true;
         newDx = -newDx;
-        newX = PADDLE_WIDTH + prevBall.radius; // prevent sticking
-        // Change angle based on where it hit the paddle
+        newX = PADDLE_WIDTH + prevBall.radius; 
         const deltaY = newY - paddle1.y;
         newDy = deltaY * 0.25; 
-        newSpeed = Math.min(MAX_BALL_SPEED, newSpeed * 1.05);
       }
-      // Player 2 (right paddle)
       else if (newDx > 0 && 
                newX + prevBall.radius > BOARD_WIDTH - PADDLE_WIDTH &&
                newX + prevBall.radius < BOARD_WIDTH &&
                newY > paddle2.y - PADDLE_HEIGHT / 2 && 
                newY < paddle2.y + PADDLE_HEIGHT / 2) {
+        hit = true;
         newDx = -newDx;
-        newX = BOARD_WIDTH - PADDLE_WIDTH - prevBall.radius; // prevent sticking
+        newX = BOARD_WIDTH - PADDLE_WIDTH - prevBall.radius;
         const deltaY = newY - paddle2.y;
         newDy = deltaY * 0.25;
-        newSpeed = Math.min(MAX_BALL_SPEED, newSpeed * 1.05);
+      }
+
+      if (hit) {
+        newHitCounter = hitCounter + 1;
+        setHitCounter(newHitCounter); // Update state for next frame
+
+        if (newHitCounter <= RAMP_UP_HITS) {
+          const speedIncrement = (INITIAL_BALL_SPEED_TARGET - VERY_SLOW_INITIAL_SPEED) / RAMP_UP_HITS;
+          newSpeed = VERY_SLOW_INITIAL_SPEED + (newHitCounter * speedIncrement);
+          newSpeed = Math.min(newSpeed, INITIAL_BALL_SPEED_TARGET); // Cap at target
+        } else {
+          newSpeed = Math.min(MAX_BALL_SPEED, prevBall.speed * 1.05); // Existing progressive increase
+        }
       }
       
-      // Normalize dx/dy based on newSpeed
       const magnitude = Math.sqrt(newDx * newDx + newDy * newDy);
       if (magnitude > 0) {
         newDx = (newDx / magnitude) * newSpeed;
         newDy = (newDy / magnitude) * newSpeed;
       }
 
-
       // Scoring
-      if (newX - prevBall.radius < 0) { // Player 2 scores
+      if (newX - prevBall.radius < 0) { 
         setScore(s => ({ ...s, player2: s.player2 + 1 }));
         if (score.player2 + 1 >= WINNING_SCORE) {
           setGameStatus("gameover");
@@ -192,7 +203,7 @@ const PongGame: React.FC = () => {
         } else {
           resetBall('player1');
         }
-      } else if (newX + prevBall.radius > BOARD_WIDTH) { // Player 1 scores
+      } else if (newX + prevBall.radius > BOARD_WIDTH) { 
         setScore(s => ({ ...s, player1: s.player1 + 1 }));
         if (score.player1 + 1 >= WINNING_SCORE) {
           setGameStatus("gameover");
@@ -205,7 +216,7 @@ const PongGame: React.FC = () => {
     });
     
     gameLoopRef.current = requestAnimationFrame(update);
-  }, [gameStatus, gameMode, paddle1.y, paddle2.y, resetBall, score, toast]);
+  }, [gameStatus, gameMode, paddle1.y, paddle2.y, resetBall, score, toast, hitCounter]);
 
   useEffect(() => {
     if (gameStatus === "playing") {
@@ -218,16 +229,15 @@ const PongGame: React.FC = () => {
     };
   }, [gameStatus, update]);
   
-  // AI Update Loop
   useEffect(() => {
     if (gameStatus === "playing" && gameMode === "humanVsAi") {
       const aiLogic = () => {
-        if (ball.dx > 0) { // Only call AI if ball is moving towards it
+        if (ball.dx > 0) { 
             fetchAiMove(paddle2.y);
         }
-        aiUpdateTimeoutRef.current = setTimeout(aiLogic, 150); // AI "thinks" periodically
+        aiUpdateTimeoutRef.current = setTimeout(aiLogic, 150); 
       };
-      aiLogic(); // Initial call
+      aiLogic(); 
       return () => {
         if (aiUpdateTimeoutRef.current) clearTimeout(aiUpdateTimeoutRef.current);
       };
@@ -239,6 +249,38 @@ const PongGame: React.FC = () => {
     setGameMode(mode);
     resetGame();
   };
+
+  if (gameStatus === "instructions") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full font-mono p-8 bg-card text-card-foreground rounded-lg shadow-xl max-w-2xl mx-auto text-center">
+        <h1 className="text-5xl font-bold text-primary mb-8">Game Instructions</h1>
+        <div className="text-lg space-y-4 mb-10 text-left px-4">
+          <p><strong className="text-accent">Objective:</strong> Be the first to score 5 points!</p>
+          <p><strong className="text-accent">Ball Speed:</strong> The ball starts slow and speeds up with each paddle hit for the first {RAMP_UP_HITS} hits, then continues to accelerate.</p>
+          <div>
+            <h2 className="text-2xl font-semibold text-primary mb-2">Controls:</h2>
+            <ul className="list-disc list-inside space-y-1 pl-4">
+              <li><strong>Player 1 (Left Paddle):</strong>
+                <ul className="list-disc list-inside pl-6">
+                    <li><code className="bg-muted px-2 py-1 rounded text-sm">W</code> key: Move Up</li>
+                    <li><code className="bg-muted px-2 py-1 rounded text-sm">S</code> key: Move Down</li>
+                </ul>
+              </li>
+              <li className="mt-2"><strong>Player 2 (Right Paddle - Player vs Player mode):</strong>
+                 <ul className="list-disc list-inside pl-6">
+                    <li><code className="bg-muted px-2 py-1 rounded text-sm">ArrowUp</code> key: Move Up</li>
+                    <li><code className="bg-muted px-2 py-1 rounded text-sm">ArrowDown</code> key: Move Down</li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <Button size="lg" className="text-xl py-6 px-10" onClick={() => setGameStatus("menu")}>
+          Proceed to Menu
+        </Button>
+      </div>
+    );
+  }
 
   if (gameStatus === "menu") {
     return (
@@ -264,7 +306,6 @@ const PongGame: React.FC = () => {
         <PaddleComponent {...paddle2} isLeft={false} boardHeight={BOARD_HEIGHT} />
         <BallComponent {...ball} />
 
-        {/* Dashed center line */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 h-full w-1">
           {Array.from({ length: 20 }).map((_, i) => (
             <div key={i} className="h-[15px] w-full bg-muted-foreground/50 mb-[15px]"></div>
@@ -276,7 +317,7 @@ const PongGame: React.FC = () => {
             <h2 className="text-5xl font-bold text-accent mb-4">
               {score.player1 >= WINNING_SCORE ? "Player 1 Wins!" : (gameMode === 'humanVsAi' ? 'AI Wins!' : 'Player 2 Wins!')}
             </h2>
-            <Button size="lg" onClick={() => setGameStatus("menu")}>Back to Menu</Button>
+            <Button size="lg" onClick={() => setGameStatus("instructions")}>Back to Menu</Button> 
           </div>
         )}
       </div>

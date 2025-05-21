@@ -19,6 +19,6 @@ export interface Score {
   player2: number;
 }
 
-export type GameStatus = "menu" | "playing" | "paused" | "gameover";
+export type GameStatus = "instructions" | "menu" | "playing" | "paused" | "gameover";
 export type GameMode = "humanVsHuman" | "humanVsAi";
 export type PlayerKey = "player1" | "player2";
