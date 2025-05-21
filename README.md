@@ -2,6 +2,10 @@
 
 This is a classic Pong game with a modern twist, built with Next.js and AI.
 
+![Menu](pong1.png)
+
+![Game](pong2.png)
+
 ## Getting Started
 
 ### Prerequisites
